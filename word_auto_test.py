@@ -54,7 +54,6 @@ time.sleep(0.5)
 word.set_focus()
 time.sleep(0.5)
 
-# ⚠️ 这个 TAB 次数和 Office 版本有关
 for _ in range(6):
     send_keys("{TAB}")
     time.sleep(0.3)
