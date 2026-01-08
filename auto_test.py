@@ -5,12 +5,16 @@ from pywinauto import Application
 # --------------------------------------------------
 # 配置
 # --------------------------------------------------
-APP_PATH = r"C:\Program Files\Biobot\UroBiopsy\UroBiopsy.exe"
+import configparser
 
-USERNAME = "service"
-PASSWORD = "Biobot123@"
+config = configparser.ConfigParser()
+config.read("config.ini", encoding="utf-8")
 
-LOOP_COUNT = 10
+APP_PATH = config["app"]["path"]
+USERNAME = config["login"]["username"]
+PASSWORD = config["login"]["password"]
+
+LOOP_COUNT = int(config["test"]["loop_count"])
 
 
 # --------------------------------------------------
@@ -60,7 +64,7 @@ init_btn = main_dlg.child_window(
     control_type="Button"
 )
 
-init_btn.wait("visible enabled", timeout=60)
+init_btn.wait("visible enabled", timeout=200)
 
 print("Main UI ready")
 
@@ -87,17 +91,17 @@ for i in range(1, LOOP_COUNT + 1):
     )
 
     # 第一次初始化
-    init_btn.wait("enabled", timeout=10)
+    init_btn.wait("enabled", timeout=200)
     init_btn.click_input()
     time.sleep(2)
 
     # 点击 Yes
-    yes_btn.wait("enabled", timeout=30)
+    yes_btn.wait("enabled", timeout=200)
     yes_btn.click_input()
     time.sleep(5)
 
     # 点击 Cancel
-    cancel_btn.wait("enabled", timeout=30)
+    cancel_btn.wait("enabled", timeout=200)
     cancel_btn.click_input()
     time.sleep(2)
 
@@ -128,7 +132,7 @@ yes_btn = app.window(title_re=".*").child_window(
     control_type="Button"
 )
 
-yes_btn.wait("enabled", timeout=30)
+yes_btn.wait("enabled", timeout=200)
 yes_btn.click_input()
 
 
