@@ -1,12 +1,14 @@
 import time
+import os
+import sys
+import traceback
 from pywinauto import Application
-
-
-# --------------------------------------------------
-# 配置
-# --------------------------------------------------
 import configparser
 
+
+# --------------------------------------------------
+# 读取配置
+# --------------------------------------------------
 config = configparser.ConfigParser()
 config.read("config.ini", encoding="utf-8")
 
@@ -16,124 +18,121 @@ PASSWORD = config["login"]["password"]
 
 LOOP_COUNT = int(config["test"]["loop_count"])
 
-
-# --------------------------------------------------
-# 启动应用
-# --------------------------------------------------
-print("Starting UroBiopsy...")
-app = Application(backend="uia").start(APP_PATH)
-
-time.sleep(5)
+AUTO_SHUTDOWN = config.getboolean("system", "auto_shutdown", fallback=False)
+SHUTDOWN_DELAY = config.getint("system", "shutdown_delay", fallback=60)
 
 
 # --------------------------------------------------
-# 登录界面
+# 自动关机函数（统一出口）
 # --------------------------------------------------
-print("Waiting for Login window...")
-
-login_dlg = app.window(title_re=".*UroBiopsy.*Login.*")
-login_dlg.wait("visible", timeout=30)
-
-login_dlg.child_window(
-    auto_id="UserLoginDialog.frame.EditUsername",      
-    control_type="Edit"
-).set_text(USERNAME)
-
-login_dlg.child_window(
-    auto_id="UserLoginDialog.frame.EditPassword",      
-    control_type="Edit"
-).set_text(PASSWORD)
-
-login_dlg.child_window(
-    auto_id="UserLoginDialog.frame_2.buttonLogin",                  
-    control_type="Button"
-).click_input()
-
-print("Login clicked")
+def shutdown_system():
+    if AUTO_SHUTDOWN:
+        print(f"[SYSTEM] Shutdown in {SHUTDOWN_DELAY} seconds...")
+        os.system(f"shutdown /s /t {SHUTDOWN_DELAY}")
 
 
 # --------------------------------------------------
-# 等待主界面
+# 主逻辑
 # --------------------------------------------------
-print("Waiting for Main UI...")
+def main():
+    print("Starting UroBiopsy...")
 
-main_dlg = app.window(title_re=".*UroBiopsy.*")
-
-init_btn = main_dlg.child_window(
-    title="Initialize Robot",
-    control_type="Button"
-)
-
-init_btn.wait("visible enabled", timeout=200)
-
-print("Main UI ready")
-
-
-# --------------------------------------------------
-# 初始化 + Cancel 循环
-# --------------------------------------------------
-for i in range(1, LOOP_COUNT + 1):
-    print(f"Initialization cycle {i}")
-
-    init_btn = main_dlg.child_window(
-        title="Initialize Robot",    
-        control_type="Button"
-    )
-
-    yes_btn = main_dlg.child_window(
-        title="Yes",                   
-        control_type="Button"
-    )
-
-    cancel_btn = main_dlg.child_window(
-        title="Cancel",                   
-        control_type="Button"
-    )
-
-    # 第一次初始化
-    init_btn.wait("enabled", timeout=200)
-    init_btn.click_input()
-    time.sleep(2)
-
-    # 点击 Yes
-    yes_btn.wait("enabled", timeout=200)
-    yes_btn.click_input()
+    app = Application(backend="uia").start(APP_PATH)
     time.sleep(5)
 
-    # 点击 Cancel
-    cancel_btn.wait("enabled", timeout=200)
-    cancel_btn.click_input()
-    time.sleep(2)
+    # ---------------- 登录界面 ----------------
+    print("Waiting for Login window...")
 
-    # # 第二次初始化（完整执行）
-    # init_btn.wait("enabled", timeout=30)
-    # init_btn.click_input()
+    login_dlg = app.window(title_re=".*UroBiopsy.*Login.*")
+    login_dlg.wait("visible", timeout=60)
 
-    # # 等待初始化完成
-    # # 推荐方式：等待按钮重新可用
-    # init_btn.wait("enabled", timeout=300)
+    login_dlg.child_window(
+        auto_id="UserLoginDialog.frame.EditUsername",
+        control_type="Edit"
+    ).set_text(USERNAME)
 
-    # time.sleep(1)
+    login_dlg.child_window(
+        auto_id="UserLoginDialog.frame.EditPassword",
+        control_type="Edit"
+    ).set_text(PASSWORD)
+
+    login_dlg.child_window(
+        auto_id="UserLoginDialog.frame_2.buttonLogin",
+        control_type="Button"
+    ).click_input()
+
+    print("Login clicked")
+
+    # ---------------- 主界面 ----------------
+    print("Waiting for Main UI...")
+
+    main_dlg = app.window(title_re=".*UroBiopsy.*")
+
+    init_btn = main_dlg.child_window(
+        title="Initialize Robot",
+        control_type="Button"
+    )
+
+    init_btn.wait("visible enabled", timeout=200)
+
+    print("Main UI ready")
+
+    # ---------------- 初始化循环 ----------------
+    for i in range(1, LOOP_COUNT + 1):
+        print(f"Initialization cycle {i}")
+
+        init_btn = main_dlg.child_window(
+            title="Initialize Robot",
+            control_type="Button"
+        )
+
+        yes_btn = main_dlg.child_window(
+            title="Yes",
+            control_type="Button"
+        )
+
+        cancel_btn = main_dlg.child_window(
+            title="Cancel",
+            control_type="Button"
+        )
+
+        init_btn.wait("enabled", timeout=200)
+        init_btn.click_input()
+        time.sleep(2)
+
+        yes_btn.wait("enabled", timeout=200)
+        yes_btn.click_input()
+        time.sleep(5)
+
+        cancel_btn.wait("enabled", timeout=200)
+        cancel_btn.click_input()
+        time.sleep(2)
+
+    # ---------------- 退出应用 ----------------
+    print("Closing UroBiopsy...")
+    main_dlg.set_focus()
+    time.sleep(1)
+    main_dlg.type_keys("%{F4}")
+
+    yes_btn = app.window(title_re=".*").child_window(
+        title="Yes",
+        control_type="Button"
+    )
+
+    yes_btn.wait("enabled", timeout=200)
+    yes_btn.click_input()
+
+    print("TEST COMPLETED SUCCESSFULLY")
 
 
 # --------------------------------------------------
-# 退出应用
+# 程序入口 + 异常兜底
 # --------------------------------------------------
-print("Closing UroBiopsy...")
-print("Closing via Alt+F4")
-
-main_dlg.set_focus()
-time.sleep(1)
-main_dlg.type_keys("%{F4}")
-
-# 确认退出
-yes_btn = app.window(title_re=".*").child_window(
-    title="Yes",
-    control_type="Button"
-)
-
-yes_btn.wait("enabled", timeout=200)
-yes_btn.click_input()
-
-
-print("TEST COMPLETED SUCCESSFULLY")
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print("ERROR OCCURRED")
+        traceback.print_exc()
+    finally:
+        shutdown_system()
